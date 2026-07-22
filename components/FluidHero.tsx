@@ -182,15 +182,10 @@ export default function FluidHero({ children }: { children: React.ReactNode }) {
     <section
       ref={hostRef}
       aria-label="Interactive fluid simulation banner"
-      className="full-bleed relative flex min-h-[88vh] items-center overflow-hidden"
+      className="hero-pin full-bleed"
       style={{ touchAction: "pan-y" }}
     >
       <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 h-full w-full" />
-      {/* fade the bottom edge into the page so there is no hard seam */}
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-40"
-        style={{ background: "linear-gradient(to bottom, transparent, var(--bg))" }}
-      />
       <div className="relative mx-auto w-full max-w-5xl px-6">
         {children}
         <p className="eyebrow mt-10 hidden items-center gap-2 text-[var(--muted)] md:flex">

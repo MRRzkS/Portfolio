@@ -109,7 +109,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="pt-20 pb-16">
+    <div className="mx-auto max-w-5xl px-6 pt-32 pb-16">
       <div className="flex items-baseline justify-between">
         <div>
           <p className="eyebrow">Owner dashboard</p>

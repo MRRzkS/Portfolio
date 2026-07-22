@@ -30,7 +30,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="pt-24 max-w-sm">
+    <div className="mx-auto max-w-5xl px-6 pt-32 pb-16">
       <p className="eyebrow">Owner access</p>
       <h1 className="mt-3 text-2xl font-semibold tracking-tight">Sign in</h1>
       <form onSubmit={signIn} className="mt-6 space-y-4">
