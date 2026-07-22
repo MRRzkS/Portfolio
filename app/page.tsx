@@ -1,323 +1,163 @@
-"use client";
+import Link from "next/link";
+import FluidHero from "@/components/FluidHero";
+import GridBackdrop from "@/components/GridBackdrop";
+import ProjectCard from "@/components/ProjectCard";
+import Reveal from "@/components/Reveal";
+import { getPublishedProjects } from "@/lib/projects";
 
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createBrowserSupabase } from "@/lib/supabase/browser";
-import { seedProjects, type Project } from "@/lib/seed";
+export const revalidate = 60;
 
-type Draft = Omit<Project, "id" | "sort_order"> & {
-  id?: string;
-  sort_order: number | "";
-};
-
-const emptyDraft: Draft = {
-  slug: "",
-  title: "",
-  tagline: "",
-  description: "",
-  tech: [],
-  category: "Software",
-  repo_url: null,
-  demo_url: null,
-  image_url: null,
-  sort_order: 100,
-  published: true,
-};
-
-export default function DashboardPage() {
-  const router = useRouter();
-  const supabase = createBrowserSupabase();
-  const [rows, setRows] = useState<Project[]>([]);
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
-  const [slugError, setSlugError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("projects")
-      .select("*")
-      .order("sort_order", { ascending: true });
-    if (!error && data) setRows(data as Project[]);
-    setLoading(false);
-  }, [supabase]);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) router.replace("/login");
-      else load();
-    });
-  }, [supabase, router, load]);
-
-  function validateSlug(value: string) {
-    setSlugError(
-      /^[a-z0-9]+(-[a-z0-9]+)*$/.test(value)
-        ? null
-        : "Use lowercase letters, numbers, and single hyphens."
-    );
-  }
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    if (slugError) return;
-    setStatus("Saving");
-    const payload = {
-      slug: draft.slug,
-      title: draft.title,
-      tagline: draft.tagline,
-      description: draft.description,
-      tech: draft.tech,
-      category: draft.category || "Software",
-      repo_url: draft.repo_url || null,
-      image_url: draft.image_url || null,
-      demo_url: draft.demo_url || null,
-      sort_order: Number(draft.sort_order) || 100,
-      published: draft.published,
-    };
-    const query = draft.id
-      ? supabase.from("projects").update(payload).eq("id", draft.id)
-      : supabase.from("projects").insert(payload);
-    const { error } = await query;
-    setStatus(error ? "Save failed: " + error.message : "Saved");
-    if (!error) {
-      setDraft(emptyDraft);
-      load();
-    }
-  }
-
-  async function remove(row: Project) {
-    const ok = window.confirm(
-      'Delete "' + row.title + '"? This cannot be undone.'
-    );
-    if (!ok) return;
-    const { error } = await supabase.from("projects").delete().eq("id", row.id);
-    setStatus(error ? "Delete failed: " + error.message : "Deleted");
-    load();
-  }
-
-  async function importSeed() {
-    setStatus("Importing seed projects");
-    const payload = seedProjects.map(({ id, ...rest }) => rest);
-    const { error } = await supabase.from("projects").insert(payload);
-    setStatus(error ? "Import failed: " + error.message : "Seed imported");
-    load();
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut();
-    router.replace("/login");
-  }
+export default async function Home() {
+  const projects = await getPublishedProjects();
+  const featured = projects.slice(0, 4);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 pt-32 pb-16">
-      <div className="flex items-baseline justify-between">
-        <div>
-          <p className="eyebrow">Owner dashboard</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight">
-            Portfolio content
-          </h1>
-        </div>
-        <button onClick={signOut} className="quiet-link text-sm">
-          Sign out
-        </button>
-      </div>
-
-      {status && (
-        <p className="mt-4 text-sm text-[var(--graphite)]" role="status">
-          {status}
+    <div>
+      {/* Hero: pinned, then covered by the section below on scroll. */}
+      <FluidHero>
+        <p className="eyebrow accent">
+          Informatics Engineering / Universitas Pancasila
         </p>
-      )}
+        <h1 className="mt-4 max-w-[17ch] text-5xl font-bold leading-[1.05] md:text-6xl">
+          I build machine learning models and software that ships.
+        </h1>
+        <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-[var(--muted)]">
+          Rienchy Razak. Undergraduate at GPA 3.87, with hands-on deep learning
+          implementation in PyTorch and full-lifecycle software engineering in
+          Java and TypeScript. Currently seeking an AI or Backend internship.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link className="btn primary" href="/projects">View projects</Link>
+          <a className="btn ghost" href="#contact">Get in touch</a>
+        </div>
+      </FluidHero>
 
-      <section className="mt-8">
-        {loading ? (
-          <p className="text-sm text-[var(--graphite)]">Loading projects</p>
-        ) : rows.length === 0 ? (
-          <div className="rule py-8">
-            <p className="text-sm text-[var(--graphite)]">
-              No projects in the database yet. Import the CV seed to start,
-              then edit each entry.
-            </p>
-            <button
-              onClick={importSeed}
-              className="mt-3 rounded-md bg-[var(--blueprint)] px-4 py-2 text-sm font-medium text-white"
-            >
-              Import seed projects
-            </button>
-          </div>
-        ) : (
-          rows.map((row) => (
-            <div
-              key={row.id}
-              className="rule flex flex-wrap items-center justify-between gap-2 py-3"
-            >
-              <div>
-                <p className="font-medium">
-                  {row.title}{" "}
-                  {!row.published && (
-                    <span className="font-[family-name:var(--font-mono)] text-xs text-[var(--graphite)]">
-                      draft
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-[var(--graphite)]">{row.slug}</p>
+      {/* Everything below rides over the hero. */}
+      <div className="cover">
+        <GridBackdrop />
+        <div className="relative z-10 mx-auto max-w-5xl px-6 pb-4 pt-20">
+          {/* Selected work */}
+          <section id="work" aria-labelledby="work-heading">
+            <Reveal>
+              <div className="flex items-baseline justify-between">
+                <div>
+                  <p className="eyebrow">Selected work</p>
+                  <h2 id="work-heading" className="mt-2 text-2xl font-semibold tracking-tight">
+                    Built, documented, defensible.
+                  </h2>
+                </div>
+                <Link className="quiet-link hidden text-sm sm:block" href="/projects">
+                  All projects
+                </Link>
               </div>
-              <div className="flex gap-4 text-sm">
-                <button
-                  className="quiet-link"
-                  onClick={() =>
-                    setDraft({ ...row, sort_order: row.sort_order })
-                  }
-                >
-                  Edit
-                </button>
-                <button
-                  className="text-[var(--destructive)]"
-                  onClick={() => remove(row)}
-                >
-                  Delete
-                </button>
-              </div>
+            </Reveal>
+            <div className="mt-8 grid gap-6 sm:grid-cols-2">
+              {featured.map((p, i) => (
+                <Reveal key={p.slug} delay={(i % 2) * 60}>
+                  <ProjectCard project={p} />
+                </Reveal>
+              ))}
             </div>
-          ))
-        )}
-      </section>
+            <p className="mt-8 text-sm sm:hidden">
+              <Link className="quiet-link" href="/projects">All projects</Link>
+            </p>
+          </section>
 
-      <form onSubmit={save} className="mt-10 max-w-xl space-y-4">
-        <p className="eyebrow">{draft.id ? "Edit project" : "Add project"}</p>
-        <label className="block text-sm">
-          Title
-          <input
-            required
-            value={draft.title}
-            onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-            className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
-          />
-        </label>
-        <label className="block text-sm">
-          Slug
-          <input
-            required
-            value={draft.slug}
-            onChange={(e) => setDraft({ ...draft, slug: e.target.value })}
-            onBlur={(e) => validateSlug(e.target.value)}
-            className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
-          />
-          {slugError && (
-            <span className="mt-1 block text-xs text-[var(--destructive)]">
-              {slugError}
-            </span>
-          )}
-        </label>
-        <label className="block text-sm">
-          Tagline
-          <input
-            value={draft.tagline}
-            onChange={(e) => setDraft({ ...draft, tagline: e.target.value })}
-            className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
-          />
-        </label>
-        <label className="block text-sm">
-          Description
-          <textarea
-            rows={4}
-            value={draft.description}
-            onChange={(e) =>
-              setDraft({ ...draft, description: e.target.value })
-            }
-            className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
-          />
-        </label>
-        <label className="block text-sm">
-          Tech (comma separated)
-          <input
-            value={draft.tech.join(", ")}
-            onChange={(e) =>
-              setDraft({
-                ...draft,
-                tech: e.target.value
-                  .split(",")
-                  .map((t) => t.trim())
-                  .filter(Boolean),
-              })
-            }
-            className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
-          />
-        </label>
-        <div className="grid grid-cols-2 gap-4">
-          <label className="block text-sm">
-            Repository URL
-            <input
-              value={draft.repo_url ?? ""}
-              onChange={(e) =>
-                setDraft({ ...draft, repo_url: e.target.value })
-              }
-              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm">
-            Category
-            <select
-              value={draft.category}
-              onChange={(e) =>
-                setDraft({ ...draft, category: e.target.value as Draft["category"] })
-              }
-              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
-            >
-              <option value="Machine Learning">Machine Learning</option>
-              <option value="Software">Software</option>
-            </select>
-          </label>
-          <label className="block text-sm">
-            Image URL
-            <input
-              value={draft.image_url ?? ""}
-              onChange={(e) =>
-                setDraft({ ...draft, image_url: e.target.value })
-              }
-              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm">
-            Sort order
-            <input
-              type="number"
-              value={draft.sort_order}
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  sort_order:
-                    e.target.value === "" ? "" : Number(e.target.value),
-                })
-              }
-              className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
-            />
-          </label>
+          {/* Approach */}
+          <section id="approach" className="pt-24" aria-labelledby="approach-heading">
+            <Reveal>
+              <p className="eyebrow accent">Approach</p>
+              <h2
+                id="approach-heading"
+                className="mt-2 max-w-[20ch] text-3xl font-semibold leading-tight tracking-tight"
+              >
+                Two disciplines, one habit of rigor.
+              </h2>
+            </Reveal>
+            <div className="mt-8 grid gap-6 md:grid-cols-3">
+              <Reveal delay={0}>
+                <div className="card h-full p-6">
+                  <h3 className="font-head text-lg font-semibold">Machine learning, end to end</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
+                    From classical classifiers to modern neural architectures,
+                    I implement, train, and benchmark models in PyTorch and
+                    scikit-learn, and I read the papers behind them.
+                  </p>
+                </div>
+              </Reveal>
+              <Reveal delay={60}>
+                <div className="card h-full p-6">
+                  <h3 className="font-head text-lg font-semibold">Software that ships</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
+                    From a full-lifecycle Java application to an offline-first
+                    PWA written in vanilla JavaScript, I care about working
+                    software, audit trails, and code someone else can read.
+                  </p>
+                </div>
+              </Reveal>
+              <Reveal delay={120}>
+                <div className="card h-full p-6">
+                  <h3 className="font-head text-lg font-semibold">Detail as a default</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
+                    Accelerated coursework at GPA 3.87, IEEE-format write-ups,
+                    and interfaces built for real devices. The small things are
+                    the work.
+                  </p>
+                </div>
+              </Reveal>
+            </div>
+          </section>
+
+          {/* Contact */}
+          <section id="contact" className="pt-24" aria-labelledby="contact-heading">
+            <Reveal>
+              <div className="card p-8 md:p-10">
+                <p className="eyebrow accent">Contact</p>
+                <h2
+                  id="contact-heading"
+                  className="mt-2 max-w-[22ch] text-3xl font-semibold leading-tight tracking-tight"
+                >
+                  Open to an AI or Backend internship.
+                </h2>
+                <p className="mt-4 max-w-xl text-[var(--muted)]">
+                  I am looking for a team where I can learn quickly and
+                  contribute to real systems, whether the work is modeling,
+                  data, or backend engineering. The fastest way to reach me is
+                  email.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <a className="btn primary" href="mailto:rienchy.razak@gmail.com">Email me</a>
+                  <a
+                    className="btn ghost"
+                    href="https://www.linkedin.com/in/rienchy-razak"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    LinkedIn
+                  </a>
+                  <a
+                    className="btn ghost"
+                    href="https://github.com/MRRzkS"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    GitHub
+                  </a>
+                </div>
+              </div>
+            </Reveal>
+          </section>
+
+          <footer className="mt-24 pb-12">
+            <div className="rule flex flex-wrap items-center justify-between gap-3 pt-6 text-sm text-[var(--muted)]">
+              <p>Muhammad Rienchy Razak Simatupang, Depok, Indonesia</p>
+              <a className="quiet-link" href="mailto:rienchy.razak@gmail.com">
+                rienchy.razak@gmail.com
+              </a>
+            </div>
+          </footer>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={draft.published}
-            onChange={(e) =>
-              setDraft({ ...draft, published: e.target.checked })
-            }
-          />
-          Published
-        </label>
-        <div className="flex gap-3">
-          <button className="rounded-md bg-[var(--blueprint)] px-4 py-2 text-sm font-medium text-white">
-            {draft.id ? "Save changes" : "Add project"}
-          </button>
-          {draft.id && (
-            <button
-              type="button"
-              onClick={() => setDraft(emptyDraft)}
-              className="quiet-link text-sm"
-            >
-              Cancel edit
-            </button>
-          )}
-        </div>
-      </form>
+      </div>
     </div>
   );
 }
